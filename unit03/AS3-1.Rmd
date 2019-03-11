@@ -1,0 +1,246 @@
+---
+title: "AS3-1: 數位偵探"
+author: "第 10 組"
+date: "`r Sys.time()`"
+output: 
+  html_document:
+    highlight: pygments
+    theme: flatly
+    css: style.css
+---
+
+```{r results='hide', message=FALSE, warning=FALSE, echo=F}
+# 這些程式碼設定網頁的格式，並安裝、載入一些基本的套件，請大家不要去改動<br>
+rm(list=ls(all=T))
+knitr::opts_chunk$set(comment = NA)
+knitr::opts_knit$set(global.par = TRUE)
+par(cex=0.8)
+options(scipen=20, digits=4, width=90)
+#
+if(!require(pacman)) install.packages("pacman")
+pacman::p_load(dplyr, d3heatmap)
+```
+<hr>
+
+犯罪是一個國際關注的問題，但它在不同的國家以不同的方式記錄和處理。 在美國，聯邦調查局（FBI）記錄了暴力犯罪和財產犯罪。 此外，每個城市都記錄了犯罪行為，一些城市發布了有關犯罪率的數據。 伊利諾伊州芝加哥市從2001年開始在線發布犯罪數據。
+
+芝加哥是美國人口第三多的城市，人口超過270萬。在這個作業裡面，我們將關注一種特定類型的財產犯罪，稱為「汽車盜竊」，我們將使用R中的一些基本數據分析來了解芝加哥的汽車盜竊紀錄。請載入文件"data/mvtWeek1.csv"：以下是各欄位的描述：
+
++ `ID`: a unique identifier for each observation
++ `Date`: the date the crime occurred
++ `LocationDescription`: the location where the crime occurred
++ `Arrest`: whether or not an arrest was made for the crime (TRUE if an arrest was made, and FALSE if an arrest was not made)
++ `Domestic`: whether or not the crime was a domestic crime, meaning that it was committed against a family member (TRUE if it was domestic, and FALSE if it was not domestic)
++ `Beat`: the area, or "beat" in which the crime occurred. This is the smallest regional division defined by the Chicago police department.
++ `District`: the police district in which the crime occured. Each district is composed of many beats, and are defined by the Chicago Police Department.
++ `CommunityArea`: the community area in which the crime occurred. Since the 1920s, Chicago has been divided into what are called "community areas", of which there are now 77. The community areas were devised in an attempt to create socially homogeneous regions.
++ `Year`: the year in which the crime occurred.
++ `Latitude`: the latitude of the location at which the crime occurred.
++ `Longitude`: the longitude of the location at which the crime occurred.
+
+<br>
+
+- - -
+
+###  Section-1 Loading the Data
+
+【1.1】How many rows of data (observations) are in this dataset?
+```{r}
+#將CSV檔從DATA中載入,使用read.csv()函數,並將檔案名命名為superman,並利用nrow()函數得知有多少列的觀察值在superman檔案中
+superman = read.csv("data/mvtWeek1.csv", stringsAsFactors=F)
+nrow(superman)
+```
+
+檢查各欄位的資料格式
+```{r}
+#利用summary()函數，可清楚得知檔案中各欄位加總的資料為何
+summary(superman)
+```
+
+類別(Factor) versus 字串(Character)
+
+【1.2】How many variables are in this dataset?
+```{r}
+#利用ncol()能得知共有幾欄，便能得知變數有幾種
+ncol(superman)
+```
+
+
+【1.3】Using the "max" function, what is the maximum value of the variable "ID"?
+```{r}
+#利用max()函數能得知supernman中的ID最大值
+max(superman["ID"])
+```
+
+
+【1.4】 What is the minimum value of the variable "Beat"?
+```{r}
+#利用min()函數能得知supernman中的Beat最小值
+min(superman$Beat)
+```
+
+
+【1.5】 How many observations have value TRUE in the Arrest variable (this is the number of crimes for which an arrest was made)?
+```{r}
+#利用sum()函數能得知共有多少observations
+sum(superman$Arrest)
+```
+
+【1.6】 How many observations have a LocationDescription value of ALLEY?
+```{r}
+#利用sum()函數能得知共有多少observations在superman中的LocationDescription == "ALLEY"中
+sum(superman$LocationDescription == "ALLEY")
+
+```
+
+
+<br><br>
+
+- - -
+
+### Section-2 Understanding Dates in R
+
+【2.1】 In what format are the entries in the variable Date?
+
++ Month/Day/Year Hour:Minute
++ Day/Month/Year Hour:Minute
++ Hour:Minute Month/Day/Year
++ Hour:Minute Day/Month/Year
+
+```{r}
+#可以判斷出日期的結構長怎樣，head()可以看出前面六個資料
+# Month/Day/Year Hour:Minute 為此資料的格式
+head(superman)
+```
+
+```{r}
+#
+```
+
+```{r}
+#
+```
+
+```{r fig.height=2.5, fig.width=8}
+#
+```
+
+
+【2.2】 What is the month and year of the median date in our dataset? 
+```{r}
+#制定日期格式為%m/%d/%y %H:%M，並指定給ts
+ts = as.POSIXct(superman$Date, format="%m/%d/%y %H:%M")
+median(ts)
+```
+
+【2.3】 In which month did the fewest motor vehicle thefts occur?
+```{r}
+#用format挑出格式裡面有month的資料,再用table將資料分類
+#把ts以每個月為一個類別，並從小排到大
+
+table(format(ts,"%m"))
+
+```
+
+【2.4】 On which weekday did the most motor vehicle thefts occur?
+```{r}
+#sort()將數值由小排到大，再判斷何者為最多失竊的週期，排序爺小排到大，因此判斷為星期五
+sort(table(format(ts,"%w")))
+```
+
+【2.5】 Which month has the largest number of motor vehicle thefts for which an arrest was made?
+```{r}
+#找出被逮捕的並且以月為一個類別，並從小排到大
+sort(table(format(ts[superman$Arrest],"%m")))
+
+```
+
+<br><br>
+
+- - -
+
+### Section-3 Visualizing Crime Trends
+
+【3.1】 (a) In general, does it look like crime increases or decreases from 2002 - 2012? (b) In general, does it look like crime increases or decreases from 2005 - 2008? (c) In general, does it look like crime increases or decreases from 2009 - 2011?
+```{r}
+#hist()為直方圖函數,以"year"作為劃分區間,當las=1 x軸會呈現平行的文字,las=2x軸會呈現垂直的文字
+#(a)下降(b)下降(c)上升
+hist(ts,breaks="year",las=2)
+```
+
+【3.2】 Does it look like there were more crimes for which arrests were made in the first half of the time period or the second half of the time period?
+```{r}
+#FALSE代表2007-01-01之前的犯罪率,TRUE代表2007-01-01之後的犯罪率數值，
+  table(ts > as.POSIXct("2007-01-01"))
+```
+
+【3.3】 For what proportion of motor vehicle thefts in 2001 was an arrest made?
+```{r}
+#先用table()函數歸納出superman$Arrest中的2001年資料，再指派入prop.table()函數中得知比例
+table(superman$Arrest,format(ts,"%y")) %>% prop.table(margin=2)
+
+
+                                                     
+```
+【3.4】 For what proportion of motor vehicle thefts in 2007 was an arrest made?
+```{r}
+#margin=2計算欄,margin=1計算列的數值,0.10412
+#利用table()進行分類，取得年分資料,再放入prop.table()函數中
+table(superman$Arrest, format(ts,"%Y"))%>% prop.table(margin = 2)
+```
+
+【3.5】 For what proportion of motor vehicle thefts in 2012 was an arrest made?
+```{r}
+#利用table()進行分類，取得2012年資料,再放入prop.table()函數中
+#0.039
+table(superman$Arrest, format(ts,"%Y"))%>% prop.table(margin = 2)
+```
+
+<br><br>
+
+- - -
+
+### Section-4 Popular Locations
+
+【4.1】 Which locations are the top five locations for motor vehicle thefts, excluding the "Other" category? You should select 5 of the following options.
+
+```{r}
+
+#把地方找出並分成類別，並把最後六筆資料從小排到大
+table(superman$LocationDescription) %>% sort %>% tail(6)
+```
+
+【4.2】 How many observations are in Top5?
+```{r}
+#names()查詢或建立向量的元素名稱
+#找出地方並分成類別，並把最後六筆資料排除第四筆資料，並從小排到大，最後對定給top5,把前五名的地方總結
+(top5 = names(table(superman$LocationDescription) %>% sort %>% tail(6))[-4])
+sum(superman$LocationDescription %in% top5)
+            
+```
+
+【4.3】 One of the locations has a much higher arrest rate than the other locations. Which is it? 
+```{r}
+#mean()算均值的概念
+#把被逮補最多的前五名算出平均數，並從小排到大
+TOP5 = subset(superman, LocationDescription %in% top5)
+tapply(TOP5$Arrest, TOP5$LocationDescription, mean) %>% sort
+```
+
+【4.4】 On which day of the week do the most motor vehicle thefts at gas stations happen?
+```{r}
+#以一週為類別，找出最多摩托車小偷的加油站，並從小排到大
+ts[superman$Location == "GAS STATION"] %>% format('%w') %>% table %>% sort
+
+```
+
+【4.5】 On which day of the week do the fewest motor vehicle thefts in residential driveways happen?
+```{r}
+#以一週為類別，找出最少residential driveways的摩托車小偷，並從小排到大
+ts[superman$Location == "DRIVEWAY - RESIDENTIAL"] %>% format('%w') %>% table %>% sort
+```
+
+
+<br><br><br>
+
+
