@@ -139,11 +139,11 @@ median(BE$StockPrice)
 
 __§ 1.8__ What is the standard deviation of the stock price of Procter & Gamble over this time period?
 ```{r}
-var(PG$StockPrice)
+sd(PG$StockPrice)
 
 #331
 
-#用var()找出標準差
+#用sd找出標準差
 ```
 
 <br><hr>
