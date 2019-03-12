@@ -141,9 +141,9 @@ __§ 1.8__ What is the standard deviation of the stock price of Procter & Gamble
 ```{r}
 sd(PG$StockPrice)
 
-#331
+#18.19414
 
-#用sd找出標準差
+#用sd()找出標準差
 ```
 
 <br><hr>
@@ -156,13 +156,19 @@ plot(CK$Date, CK$StockPrice, type="l", main="COCACOLA")
 abline(v=CK$Date[which.max(CK$StockPrice)], col="red")
 abline(v=CK$Date[which.min(CK$StockPrice)], col="green")
 
+CK$Date[max(CK$StockPrice)]
+CK$Date[min(CK$StockPrice)]
+
+#The highest stock price on 1982-02-01
+#The lowest stock price on 1972-06-01
+
 #用plot()描繪出點狀圖，並在其中加入參數type="l"，將點連成線，成為折線圖
 #用abline()加上輔助線，並用col=" "，以不同顏色標示
 #ylim()為y的極限值，方便圖形判斷
 #col=" "為指定顏色
 #main=" "為圖形名稱
 #xlab=" "為x軸名稱；ylab=" "為y軸名稱
-#lwb= 為線條粗度
+#lwd= 為線條粗度
 
 ```
 
@@ -184,7 +190,7 @@ lines(PG$Date[361:373], PG$StockPrice[361:373], type="l", col="yellow", lwd=3)
 #col=" "為指定顏色
 #main=" "為圖形名稱
 #xlab=" "為x軸名稱；ylab=" "為y軸名稱
-#lwb= 為線條粗度
+#lwd= 為線條粗度
 
 ```
 
@@ -202,7 +208,7 @@ lines(PG$Date[145:180], PG$StockPrice[145:180], type = "l", col="yellow", lwd=3)
 #col=" "為指定顏色
 #main=" "為圖形名稱
 #xlab=" "為x軸名稱；ylab=" "為y軸名稱
-#lwb= 為線條粗度
+#lwd= 為線條粗度
 
 ```
 
@@ -218,7 +224,7 @@ lines(PG$Date[145:180], PG$StockPrice[145:180], type = "l", col="yellow", lwd=3)
 #col=" "為指定顏色
 #main=" "為圖形名稱
 #xlab=" "為x軸名稱；ylab=" "為y軸名稱
-#lwb= 為線條粗度
+#lwd= 為線條粗度
 
 ```
 
@@ -245,7 +251,7 @@ lines(PG$Date[301:432], PG$StockPrice[301:432], type="l", col="yellow", lwd=3)
 #col=" "為指定顏色
 #main=＂"為圖形名稱
 #xlab=" "為x軸名稱；ylab=" "為y軸名稱
-#lwb= 為線條粗度
+#lwd= 為線條粗度
 
 ```
 
@@ -261,7 +267,7 @@ __§ 3.2__ Which stock reaches the highest value in the time period 1995-2005?
 #col=" "為指定顏色
 #main=" "為圖形名稱
 #xlab=" "為x軸名稱；ylab=" "為y軸名稱
-#lwb= 為線條粗度
+#lwd= 為線條粗度
 
 
 ```
@@ -284,7 +290,7 @@ lines(PG$Date[333:335], PG$StockPrice[333:335], type="l", col="yellow", lwd=3)
 #col=" "為指定顏色
 #main=" "為圖形名稱
 #xlab=" "為x軸名稱；ylab=" "為y軸名稱
-#lwb= 為線條粗度
+#lwd= 為線條粗度
 
 
 ```
@@ -306,7 +312,7 @@ lines(PG$Date[409:432], PG$StockPrice[409:432], type="l", col="yellow", lwd=3)
 #col=" "為指定顏色
 #main=" "為圖形名稱
 #xlab=" "為x軸名稱；ylab=" "為y軸名稱
-#lwb= 為線條粗度
+#lwd= 為線條粗度
 
 ```
 
