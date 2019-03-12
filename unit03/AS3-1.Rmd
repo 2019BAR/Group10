@@ -114,15 +114,29 @@ head(superman)
 ```
 
 ```{r}
-#
+#轉換成POSIXct時間資料格式
+ts = as.POSIXct(superman$Date, format = "%m/%d/%y %H:%M")
+par(cex = 0.7)
+hist(ts, "year", las = 2,freq = T,xlab = "")
+
 ```
 
 ```{r}
-#
+table(format(ts,'%w')) #"%w" 會顯示0~7來表示weekday "%u"則會以1~7表示
 ```
 
 ```{r fig.height=2.5, fig.width=8}
-#
+table(format(ts, '%m')) #依月份分類
+```
+```{r}
+table(weekday=format(ts,'%w'), month=format(ts,'%m')) #months&weekday的混合矩陣
+```
+
+```{r}
+#依據犯罪次數產生熱圖
+table(format(ts,"%u"), format(ts,"%H")) %>%  
+  as.data.frame.matrix %>% 
+  d3heatmap(F,F,col=colorRamp(c('seagreen','lightyellow','red')))
 ```
 
 
