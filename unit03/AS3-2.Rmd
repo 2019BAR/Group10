@@ -1,0 +1,358 @@
+---
+title: "AS3-2: 股市動態"
+author: "第 10 組"
+date: "`r Sys.time()`"
+output:
+  html_document:
+    highlight: pygments
+    theme: flatly
+    css: style.css
+---
+
+```{r results='hide', message=FALSE, warning=FALSE, echo=FALSE}
+# 這些程式碼設定網頁的格式，並安裝、載入一些基本的套件，請大家不要去改動<br>
+rm(list=ls(all=T))
+knitr::opts_chunk$set(comment = NA)
+knitr::opts_knit$set(global.par = TRUE)
+par(cex=0.8)
+options(scipen=20, digits=4, width=90)
+#
+if(!require(pacman)) install.packages("pacman")
+pacman::p_load(dplyr)
+```
+<hr>
+
+**股票動態**
+
+股票市場是買賣雙方交易公司股票的地方，也是個人和公司投資的最受歡迎的方式之一。現在估計世界股票市場規模達到數兆。紐約證券交易所位於紐約市，是世界上最大的股票市場。 紐約證券交易所約有2,800家上市公司。在這個問題上，我們將看看其中五家公司的每月股價：IB、通用電氣（GE）、寶潔、可口可樂和波音。此問題中使用的數據來自Infochimps。
+
+使用`read.csv()`下載並讀取以下文件：
+
++ `data/IBMStock.csv`
++ `data/GEStock.csv`
++ `data/ProcterGambleStock.csv`
++ `data/CocaColaStock.csv`
++ `data/BoeingStock.csv` 
+
+分別存入資料框`IBM`、`GE`、`ProcterGamble`、`CocaCola`和`Boeing`，
+每個資料框都有兩個變量，描述如下：
+
++ `Date`：日期
++ `StockPrice`：給定月份公司的平均股價
+
+在這個案例，我們將看看這些公司的股票動態如何隨著時間的推移而發生變化。
+
+```{r}
+IBM=read.csv('data/IBMStock.csv')
+GE=read.csv('data/GEStock.csv')
+PG=read.csv('data/ProcterGambleStock.csv')
+CK=read.csv('data/CocaColaStock.csv')
+BE=read.csv('data/BoeingStock.csv')
+```
+
+
+<br><hr>
+
+###  Section-1 Summary Statistics
+
+__§ 1.1__ Our five datasets all have the same number of observations. How many observations are there in each data set?
+```{r}
+head(IBM$Date)#Month/Day/Year
+head(GE$Date)#Month/Day/Year
+head(PG$Date)#Month/Day/Year
+head(CK$Date)#Month/Day/Year
+head(BE$Date)#Month/Day/Year
+
+#480
+
+#用head()查看資料
+```
+
+
+__§ 1.2__ What is the earliest year in our datasets?
+```{r}
+IBM$Date = as.Date(IBM$Date, format='%m/%d/%y')
+GE$Date = as.Date(GE$Date, format='%m/%d/%y')
+PG$Date = as.Date(PG$Date, format='%m/%d/%y')
+CK$Date = as.Date(CK$Date, format='%m/%d/%y')
+BE$Date = as.Date(BE$Date, format='%m/%d/%y')
+head(as.Date(IBM$Date, format='%m/%d/%y'))
+head(as.Date(GE$Date, format='%m/%d/%y'))
+head(as.Date(PG$Date, format='%m/%d/%y'))
+head(as.Date(CK$Date, format='%m/%d/%y'))
+head(as.Date(BE$Date, format='%m/%d/%y'))
+
+#1/1/1970
+
+#用as.來轉換型態，並用head()來找尋最初五筆資料
+
+```
+
+__§ 1.3__ What is the latest year in our datasets?
+```{r}
+tail(as.Date(IBM$Date, format='%m/%d/%y'))
+tail(as.Date(GE$Date, format='%m/%d/%y'))
+tail(as.Date(PG$Date, format='%m/%d/%y'))
+tail(as.Date(CK$Date, format='%m/%d/%y'))
+tail(as.Date(BE$Date, format='%m/%d/%y'))
+
+#12/1/2009
+
+#用tail()來找尋最後五筆資料
+```
+
+__§ 1.4__ What is the mean stock price of IBM over this time period?
+```{r}
+mean(IBM$StockPrice)
+
+#144.4
+
+#用mean()來平均資料
+```
+
+__§ 1.5__ What is the minimum stock price of General Electric (GE) over this time period?
+```{r}
+min(GE$StockPrice)
+
+#9.294
+
+#用min()找資料最小值
+```
+
+__§ 1.6__ What is the maximum stock price of Coca-Cola over this time period?
+```{r}
+max(CK$StockPrice)
+
+#146.6
+
+#用max()找資料最大值
+```
+
+__§ 1.7__ What is the median stock price of Boeing over this time period?
+```{r}
+median(BE$StockPrice)
+
+#44.88
+
+#用median()找出中位數
+```
+
+__§ 1.8__ What is the standard deviation of the stock price of Procter & Gamble over this time period?
+```{r}
+var(PG$StockPrice)
+
+#331
+
+#用var()找出標準差
+```
+
+<br><hr>
+
+###  Section-2 Visualizing Stock Dynamics
+
+__§ 2.1__ Around what year did Coca-Cola has its highest stock price in this time period? Around what year did Coca-Cola has its lowest stock price in this time period?
+```{r}
+plot(CK$Date, CK$StockPrice, type="l", main="COCACOLA")
+abline(v=CK$Date[which.max(CK$StockPrice)], col="red")
+abline(v=CK$Date[which.min(CK$StockPrice)], col="green")
+
+#用plot()描繪出點狀圖，並在其中加入參數type="l"，將點連成線，成為折線圖
+#用abline()加上輔助線，並用col=" "，以不同顏色標示
+#ylim()為y的極限值，方便圖形判斷
+#col=" "為指定顏色
+#main=" "為圖形名稱
+#xlab=" "為x軸名稱；ylab=" "為y軸名稱
+#lwb= 為線條粗度
+
+```
+
+
+__§ 2.2__ In March of 2000, the technology bubble burst, and a stock market crash occurred. According to this plot, which company's stock dropped more?
+```{r}
+plot(CK$Date[361:373], CK$StockPrice[361:373], type="l", col="black", main="dropped more", xlab ="date", ylab="price", lwd=1, ylim = c(0, 210))
+lines(BE$Date[361:373], BE$StockPrice[361:373], type="l", col="red", lwd=1)
+lines(GE$Date[361:373], GE$StockPrice[361:373], type="l", col="green", lwd=1)
+lines(IBM$Date[361:373], IBM$StockPrice[361:373], type="l", col="blue", lwd=1)
+lines(PG$Date[361:373], PG$StockPrice[361:373], type="l", col="yellow", lwd=3)
+
+#GE had droped more
+
+#用plot()描繪出點狀圖，並在其中加入參數type="l"，將點連成線，成為折線圖。
+#並指定資料區間，以找出想要的資料範圍，資料區間可由右上角的資料庫點開查看
+#用lines()在原本的plot()點狀圖上加上其他直線
+#ylim()為y的極限值，方便圖形判斷
+#col=" "為指定顏色
+#main=" "為圖形名稱
+#xlab=" "為x軸名稱；ylab=" "為y軸名稱
+#lwb= 為線條粗度
+
+```
+
+__§ 2.3__ (a) Around 1983, the stock for one of these companies (Coca-Cola or Procter and Gamble) was going up, while the other was going down. Which one was going up? 
+```{r}
+plot(CK$Date[145:180], CK$StockPrice[145:180], type="l", col="black", main="which one is loser", xlab = "date", ylab="price", ylim = c(0,150), lwd=1)
+lines(PG$Date[145:180], PG$StockPrice[145:180], type = "l", col="yellow", lwd=3)
+
+#CocaCola is going up
+
+#用plot()描繪出點狀圖，並在其中加入參數type="l"，將點連成線，成為折線圖。
+#並指定資料區間，以找出想要的資料範圍，資料區間可由右上角的資料庫點開查看
+#用lines()在原本的plot()點狀圖上加上其他直線
+#ylim()為y的極限值，方便圖形判斷
+#col=" "為指定顏色
+#main=" "為圖形名稱
+#xlab=" "為x軸名稱；ylab=" "為y軸名稱
+#lwb= 為線條粗度
+
+```
+
+(b) In the time period shown in the plot, which stock generally has lower values?
+```{r}
+
+#CocaCola is lower one
+
+#用plot()描繪出點狀圖，並在其中加入參數type="l"，將點連成線，成為折線圖。
+#並指定資料區間，以找出想要的資料範圍，資料區間可由右上角的資料庫點開查看
+#用lines()在原本的plot()點狀圖上加上其他直線
+#ylim()為y的極限值，方便圖形判斷
+#col=" "為指定顏色
+#main=" "為圖形名稱
+#xlab=" "為x軸名稱；ylab=" "為y軸名稱
+#lwb= 為線條粗度
+
+```
+
+
+<br><hr>
+
+###  Section-3 Visualizing Stock Dynamics 1995-2005
+
+__§ 3.1__ Which stock fell the most right after the technology bubble burst in March 2000?
+```{r}
+plot(CK$Date[301:432], CK$StockPrice[301:432], type="l", col="black", main="stock dynamics", xlab ="date", ylab="price", lwd=1, ylim = c(0, 210))
+lines(BE$Date[301:432], BE$StockPrice[301:432], type="l", col="red", lwd=1)
+lines(GE$Date[301:432], GE$StockPrice[301:432], type="l", col="green", lwd=1)
+lines(IBM$Date[301:432], IBM$StockPrice[301:432], type="l", col="blue", lwd=1)
+lines(PG$Date[301:432], PG$StockPrice[301:432], type="l", col="yellow", lwd=3)
+
+
+#GE had the most fell in March 2000
+
+#用plot()描繪出點狀圖，並在其中加入參數type="l"，將點連成線，成為折線圖。
+#並指定資料區間，以找出想要的資料範圍，資料區間可由右上角的資料庫點開查看
+#用lines()在原本的plot()點狀圖上加上其他直線
+#ylim()為y的極限值，方便圖形判斷
+#col=" "為指定顏色
+#main=＂"為圖形名稱
+#xlab=" "為x軸名稱；ylab=" "為y軸名稱
+#lwb= 為線條粗度
+
+```
+
+__§ 3.2__ Which stock reaches the highest value in the time period 1995-2005?
+```{r}
+
+#IBM had reached the highest value in 1995-2005
+
+#用plot()描繪出點狀圖，並在其中加入參數type="l"，將點連成線，成為折線圖。
+#並指定資料區間，以找出想要的資料範圍，資料區間可由右上角的資料庫點開查看
+#用lines()在原本的plot()點狀圖上加上其他直線
+#ylim()為y的極限值，方便圖形判斷
+#col=" "為指定顏色
+#main=" "為圖形名稱
+#xlab=" "為x軸名稱；ylab=" "為y軸名稱
+#lwb= 為線條粗度
+
+
+```
+
+__§ 3.3__ In October of 1997, there was a global stock market crash that was caused by an economic crisis in Asia. Comparing September 1997 to November 1997, which companies saw a decreasing trend in their stock price? (Select all that apply.)
+```{r}
+plot(CK$Date[333:335], CK$StockPrice[333:335], type="l", col="black", main="decreasing trend", xlab ="date:1997", ylab="price", lwd=1, ylim = c(0, 210))
+lines(BE$Date[333:335], BE$StockPrice[333:335], type="l", col="red", lwd=1)
+lines(GE$Date[333:335], GE$StockPrice[333:335], type="l", col="green", lwd=1)
+lines(IBM$Date[333:335], IBM$StockPrice[333:335], type="l", col="blue", lwd=1)
+lines(PG$Date[333:335], PG$StockPrice[333:335], type="l", col="yellow", lwd=3)
+
+
+#P&G had decreased in Sep. to Nov.
+
+#用plot()描繪出點狀圖，並在其中加入參數type="l"，將點連成線，成為折線圖。
+#並指定資料區間，以找出想要的資料範圍，資料區間可由右上角的資料庫點開查看
+#用lines()在原本的plot()點狀圖上加上其他直線
+#ylim()為y的極限值，方便圖形判斷
+#col=" "為指定顏色
+#main=" "為圖形名稱
+#xlab=" "為x軸名稱；ylab=" "為y軸名稱
+#lwb= 為線條粗度
+
+
+```
+
+__§ 3.4__ In the last two years of this time period (2004 and 2005) which stock seems to be performing the best, in terms of increasing stock price?
+```{r}
+plot(CK$Date[409:432], CK$StockPrice[409:432], type = "l", col="black", main = "stock trend", xlab = "date:2004-2005", ylab="price", ylim = c(0,210))
+lines(BE$Date[409:432], BE$StockPrice[409:432], type="l", col="red")
+lines(GE$Date[409:432], GE$StockPrice[409:432], type="l", col="green")
+lines(IBM$Date[409:432], IBM$StockPrice[409:432], type="l", col="blue")
+lines(PG$Date[409:432], PG$StockPrice[409:432], type="l", col="yellow", lwd=3)
+
+#Boeing had best performance because it always go up
+
+#用plot()描繪出點狀圖，並在其中加入參數type="l"，將點連成線，成為折線圖。
+#並指定資料區間，以找出想要的資料範圍，資料區間可由右上角的資料庫點開查看
+#用lines()在原本的plot()點狀圖上加上其他直線
+#ylim()為y的極限值，方便圖形判斷
+#col=" "為指定顏色
+#main=" "為圖形名稱
+#xlab=" "為x軸名稱；ylab=" "為y軸名稱
+#lwb= 為線條粗度
+
+```
+
+
+<br><hr>
+
+
+###  Section-4 Monthly Trends
+
+__§ 4.1__ For IBM, compare the monthly averages to the overall average stock price. In which months has IBM historically had a higher stock price (on average)? Select all that apply.
+```{r}
+mean(IBM$StockPrice)#144.4
+tapply(IBM$StockPrice,format(IBM$Date,'%m'),mean)
+
+#January、February、March、April、May. There have five months stock price higher than 144.4
+
+#用mean()找出月股價平均值
+#用tapply()將IBM的每月股價進行平均，再進行比較
+
+```
+
+__§ 4.2__ General Electric and Coca-Cola both have their highest average stock price in the same month. Which month is this?
+```{r}
+which.max(tapply(GE$StockPrice,format(GE$Date,'%m'),mean))#
+which.max(tapply(CK$StockPrice,format(CK$Date,'%m'),mean))#
+
+#Both of April average stock price are highest
+
+#用tapply()將GE、CK的每月股價進行平均
+#用which.max()找出最高平均股價的月份
+
+```
+
+__§ 4.3__ For the months of December and January, every company's average stock is higher in one month and lower in the other. In which month are the stock prices lower?
+```{r}
+tapply(IBM$StockPrice,format(IBM$Date,'%m'),mean)
+tapply(GE$StockPrice,format(GE$Date,'%m'),mean)
+tapply(CK$StockPrice,format(CK$Date,'%m'),mean)
+tapply(PG$StockPrice,format(PG$Date,'%m'),mean)
+tapply(BE$StockPrice,format(BE$Date,'%m'),mean)
+
+#All of the December average stock price are lower than January in five companys
+
+#用tapply()將IBM、GE、CK、PG、BE的每月股價進行平均，再進行比較
+
+```
+
+<br><br><br>
+
