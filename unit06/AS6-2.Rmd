@@ -242,20 +242,13 @@ rect(x1,-0.1,x2,1.2,col= rgb(0,1,0,alpha=0.2),border=NA)
 # Calculate Probability
 (integrate(PDF, x1, x2)$value)
 
-#i3=seq(1,6-1/6,by=1/6)
-#i4=seq(1+1/6,6,by=1/6)
-#p2=data.frame(i3,i4)
-#for(i in 1:36){
-#  p2[i,3]=integrate(PDF,i3[i],i4[i])$value
-#}
-#p2$V3[is.na(p2$V3)]=0
-#head(p2[order(p2$V3,decreasing = T),],6)
+
 i1=seq(1,5,0.1)
 i2=seq(1.16,5.1,0.1)
-s10d5=data.frame(i1=i1[1:40],i2)
-for(i in 1:40){s10d5$value[i]=integrate(PDF, i1[i], i2[i])$value}
-s10d5$EV=s10d5$value*100-5
-s10d5=s10d5[order(s10d5$EV,decreasing = T),]
+p=data.frame(i1=i1[1:40],i2)
+for(i in 1:40){p$value[i]=integrate(PDF, i1[i], i2[i])$value}
+p$EV=p$value*100-5
+p=p[order(p$EV,decreasing = T),]
 
 #第4.33分-4.5分區間
 ```
