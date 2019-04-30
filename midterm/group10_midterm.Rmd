@@ -1,0 +1,198 @@
+---
+title: "Group10期中競賽"
+author: "第 10 組"
+date: "`r Sys.time()`"
+output: 
+  html_document:
+    highlight: pygments
+    theme: flatly
+    css: style.css
+---
+
+```{r setup, include=FALSE}
+rm(list=ls(all=T))
+knitr::opts_chunk$set(comment = NA)
+knitr::opts_knit$set(global.par = TRUE)
+```
+
+###Part 1 : 買家所在地和產品銷售量之間的關係
+
+## 載入csv
+```{r}
+customers = read.csv("olist_customers_dataset.csv")
+geolocation = read.csv("olist_geolocation_dataset.csv")
+items = read.csv("olist_order_items_dataset.csv")
+reviews = read.csv("olist_order_reviews_dataset.csv")
+payments = read.csv("olist_order_payments_dataset.csv")
+orders = read.csv("olist_orders_dataset.csv")
+products = read.csv("olist_products_dataset.csv")
+sellers = read.csv("olist_sellers_dataset.csv")
+translation = read.csv("product_category_name_translation.csv")
+```
+
+## 合併data 
+
+
+```{r}
+#STEP1：先合併所有olist中的data方便之後資料探索
+
+library(dplyr)
+customers_orders = merge(customers, orders, by = "customer_id")
+products_translation = merge(products, translation, by = "product_category_name")
+products_translation1 = cbind(products_translation[1], products_translation[10],products_translation[2:9])
+products_translation = products_translation1
+customers_orders_items = merge(customers_orders, items, by = "order_id")
+customers_orders_items_translation = merge(customers_orders_items, products_translation, by = "product_id")
+customers_orders_items_translation = cbind(customers_orders_items_translation[1],customers_orders_items_translation[19:20], customers_orders_items_translation[2:18], customers_orders_items_translation[21:27])
+customers_orders_items_translation_sellers = merge(customers_orders_items_translation, sellers, by = "seller_id")
+customers_orders_items_translation_sellers = cbind(customers_orders_items_translation_sellers[1],customers_orders_items_translation_sellers[28:30],customers_orders_items_translation_sellers[2:27])
+customers_orders_items_translation_sellers_payments= merge(customers_orders_items_translation_sellers,payments, by.X = "order_id",all.X = T)
+
+```
+
+
+```{r}
+#先找出個別地圖>產品分類>排序找出最多前三種
+full_data = customers_orders_items_translation_sellers_payments
+#table()
+library(dplyr)
+state_product<-full_data$seller_state
+summary(state_product) 
+
+#STEP2：挑選出買家洲的位置&購買的商品種類
+
+A = select(full_data, c("customer_state", "product_category_name_english"))
+summary(A)
+B = table(A)
+B = as.data.frame(B)
+
+
+#STEP3：將各洲依照順序排序&商品種類的頻率需大於零
+
+C = B[order(B$customer_state),]
+D=filter(C,C$Freq>0)
+
+
+
+state_name = unique(full_data$customer_state)
+
+#STEP4：使用迴圈挑選出各洲前三名的購買種類&排序
+
+i = 1
+A = subset(D, D$customer_state == state_name[i])
+A = A[order(A$Freq),] %>% tail(3)
+new_top_3 = A
+
+#再令 i=2 ，找出所有各洲排序出產品購買種類
+#最後再使用rbind( )，將所有各洲前三名購買種類合併
+#將檔案命名為new_top_3
+
+for (i in 2: length(state_name)){
+  
+
+A = subset(D, D$customer_state == state_name[i])
+A = A[order(A$Freq),] %>% tail(3)
+
+#top_3 = A
+new_top_3 = rbind(new_top_3,A)
+}
+write.csv(new_top_3, file = "new_top_3.csv", na = "" ,fileEncoding = "UTF-8")
+#STEP5：檢視new_top_3資料，確認無誤後載入shiny套件中
+```
+
+###Part 2 : 下單時間點和產品總類之間是否有關係?
+
+```{r}
+library(d3heatmap) 
+library(dplyr)
+```
+
+## 載入csv
+```{r}
+rm(list=ls(all=T))
+customers = read.csv("olist_customers_dataset.csv")
+geolocation = read.csv("olist_geolocation_dataset.csv")
+items = read.csv("olist_order_items_dataset.csv")
+reviews = read.csv("olist_order_reviews_dataset.csv")
+payments = read.csv("olist_order_payments_dataset.csv")
+orders = read.csv("olist_orders_dataset.csv")
+products = read.csv("olist_products_dataset.csv")
+sellers = read.csv("olist_sellers_dataset.csv")
+translation = read.csv("product_category_name_translation.csv")
+```
+
+## 合併data 
+
+```{r}
+customers_orders = merge(customers, orders, by = "customer_id")
+products_translation = merge(products, translation, by = "product_category_name")
+products_translation1 = cbind(products_translation[1], products_translation[10],products_translation[2:9])
+products_translation = products_translation1
+customers_orders_items = merge(customers_orders, items, by = "order_id")
+customers_orders_items_translation = merge(customers_orders_items, products_translation, by = "product_id")
+customers_orders_items_translation = cbind(customers_orders_items_translation[1],customers_orders_items_translation[19:20], customers_orders_items_translation[2:18], customers_orders_items_translation[21:27])
+customers_orders_items_translation_sellers = merge(customers_orders_items_translation, sellers, by = "seller_id")
+customers_orders_items_translation_sellers = cbind(customers_orders_items_translation_sellers[1],customers_orders_items_translation_sellers[28:30],customers_orders_items_translation_sellers[2:27])
+customers_orders_items_translation_sellers_payments= merge(customers_orders_items_translation_sellers,payments, by.X = "order_id",all.X = T)
+```
+
+
+```{r}
+full_data = customers_orders_items_translation_sellers_payments
+```
+
+```{r}
+newdata<- select(full_data,"product_category_name_english","order_purchase_timestamp")
+order_purchase_timestamp<-as.POSIXlt(newdata$order_purchase_timestamp,format = "%Y-%m-%d %H:%M:%OS")
+```
+#將資料轉為dataframe matrix格式
+```{r}
+tb<-table(newdata$product_category_name_english, format(order_purchase_timestamp, "%H"))
+df<-as.data.frame.matrix(tb)
+```
+
+#把時間區分為四個間格，並且刪除00~23點的資料
+```{r}
+df$midnight<-df$`00`+df$`01`+df$`02`+df$`03`+df$`04`+df$`05`
+df$morning<-df$`06`+df$`07`+df$`08`+df$`09`+df$`10`+df$`11`
+df$afternoon<-df$`12`+df$`13`+df$`14`+df$`15`+df$`16`+df$`17`
+df$night<-df$`18`+df$`19`+df$`20`+df$`21`+df$`22`+df$`23`
+newdf<-df[,-c(1:24)]
+newdf1<-newdf[,-c(5:8)]
+```
+
+
+```{r}
+newdf1%>% 
+  d3heatmap(F,F,col=colorRamp(c('seagreen','lightyellow','red')))
+```
+
+#算出個時段的佔比
+```{r}
+newdf$midnightprop<-newdf$midnight/(newdf$midnight+newdf$morning+newdf$afternoon+newdf$night)%>%round(3)
+newdf$morningprop<-newdf$morning/(newdf$midnight+newdf$morning+newdf$afternoon+newdf$night)%>%round(3)
+newdf$afternoonprop<-newdf$afternoon/(newdf$midnight+newdf$morning+newdf$afternoon+newdf$night)%>%round(3)
+newdf$nightprop<-newdf$night/(newdf$midnight+newdf$morning+newdf$afternoon+newdf$night)%>%round(3)
+newdfprop<-newdf[,-c(1:4)]
+```
+
+#將佔比作為熱圖
+```{r}
+newdfprop%>% 
+  d3heatmap(F,F,col=colorRamp(c('seagreen','lightyellow','red')))
+```
+
+#特殊資料
+```{r}
+newdf["security_and_service",]
+newdf["cds_dvds_musicals",]
+```
+#最多人購物的時間
+```{r}
+tb%>%
+  colSums%>%
+   sort%>%
+    tail(3)
+```
+
+
