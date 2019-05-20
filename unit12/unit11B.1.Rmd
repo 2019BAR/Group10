@@ -1,0 +1,264 @@
+---
+title: UNIT11B.1：簡單線性回歸 Simple Linear Regression
+author: 中山大學管理學院 卓雍然
+date: "`r Sys.time()`"
+output: 
+  html_document:
+    highlight: pygments
+    theme: flatly
+    css: style.css
+---
+
+```{r results='hide', message=FALSE, warning=FALSE, echo=F}
+# Formating Codes.  Do not change the codes in this chunk.<br>
+rm(list=ls(all=T))
+knitr::opts_chunk$set(comment = NA)
+knitr::opts_knit$set(global.par = TRUE)
+par(cex=0.8)
+options(scipen=20, digits=5, width=80)
+if(!require(pacman)) install.packages("pacman")
+```
+<hr>
+
+```{r results='hide', message=FALSE, warning=FALSE}
+pacman::p_load(MASS,ggplot2, ggpubr, dplyr, plotly)
+```
+
+批發商資料集
+```{r}
+W = read.csv('../unit09/data/wholesales.csv')
+W$Channel = factor( paste0("Ch",W$Channel) )
+W$Region = factor( paste0("Reg",W$Region) )
+W[3:8] = lapply(W[3:8], log, base=10)
+```
+<br><hr>
+
+###【A】用R做線性回歸 
+
++ `lm` : 方法
++ `md` : 模型
++ `Milk` : 目標變數 Response, Dependent Variable (DV)
++ `Grocery` : 預測變數 Predictor, Independent Variable (IV)
++ `W` : 資料
+
+```{r}
+md = lm(Milk ~ Grocery, W)
+```
+
+```{r}
+names(md)
+```
+<br><hr>
+
+###【B】理論 vs 實證模型
+
++ 理論模型：$y_i = \beta_0 + \beta_1 x_i + \epsilon_i, \; \epsilon \in i.i.d. Normal Dist.$
+    + $\beta_0$, $beta_1$ - 係數
+    + $y_i$ - 目標變數
+    + $x_i$ - 預測變數
+    + $\epsilon_i$ - 誤差 
+
++ 估計模型：$\hat{y}_i = b_0 + b_1 x_i$
+    + `md$coefficient` : $b_0$, $b_1$ - 係數估計值
+    + `md$fitted.value` : $\hat{y}_i$ - 目標變數估計值
+    + `md$residuals` : $e_i = y - \hat{y}$ - 殘差 
+
+```{r}
+y = W$Milk
+x = W$Grocery
+b0 = md$coef[1]
+b1 = md$coef[2]
+yhat = b0 + b1 * x 
+er = y - yhat
+```
+
+```{r}
+range(yhat - md$fitted.values)
+```
+
+```{r}
+range(er - md$residuals)
+```
+<br><hr>
+
+###【C】畫出回歸線
+
+$$ Milk_i = b_0 + b_1 Grocery_i$$
+
+```{r fig.height=3.2, fig.width=3.2}
+par(cex=0.8, mar=c(4,4,1,1))
+plot(W$Grocery, W$Milk, pch=20, col="#80808080")
+abline(b0, b1, col='red')
+```
+
+```{r fig.height=4.7, fig.width=4.5}
+ggplot(aes(Grocery, Milk), data=W) + 
+  geom_point(alpha=0.4, size=0.8) + 
+  geom_smooth(method="lm", level=0.95, col="red", lwd=0.2) -> p
+ggplotly(p)
+```
+
+<br>
+<span style="font-size:24px"> `r "\U1F5FF"` : </span>
+為什麼大部分的資料點都沒有落在95%信心區間呢？
+
+<span style="font-size:24px"> `r "\U1F4A1"` : </span>
+模型估計的是$y$的平均值($\bar{Y}|x$)、而不是$y$本身！
+<br>
+
+<br><hr>
+
+###【D】Model Summary 功能
+```{r}
+summary(md)
+```
+
++ $\hat{y}_i = 0.8318 + 0.7352 x_i$
+    + $b_0=0.8318$ : $x=0$ 時 $y$ 的估計值
+    + $b_1=0.7352$ : $x$ 對 $y$ 的平均邊際效果
+
++ Coefficients:
+    + Estimate: 係數估計值
+    + Std. Error: 係數估計值的標準差
+    + Pr(>|t|): p值 (變數之間沒有關係的機率？)
+    + Signif. codes: 顯著水準
+
+<span style="font-size:24px"> `r "\U1F4A1"` : </span>
+$b_1$ 係數代表平均而言， $x$ 每增加一單位時，$y$ 會增加的數量
+<br>
+
+<br>
+
+##### 係數的分布
+```{r fig.height=3.2, fig.width=7.2}
+curve(dnorm(x, 0.7352, 0.0301), -0.1, 1, n=400, xlab=bquote(italic(b[0])),
+      main=bquote("The Distribution of Random Variable: " ~ italic(b[0])))
+abline(v=qnorm(c(0.025, 0.975),0.7352, 0.0301), col="red")
+```
+<br>
+<span style="font-size:24px"> `r "\U1F4A1"` : </span>
+係數($b_0, b_1$)也都是隨機變數
+<br>
+
+<br><hr>
+
+### 【E】模擬一組相關的變數 Multivariate Normal Distribution
+
+**參數：平均值向量與變異(共變)矩陣**
+```{r}
+mu = c(2,3)                         # mean vector
+(Sigma = matrix(c(1,0.5,0.5,1),2))  # variance, covariance matrix
+```
+
+**隨機抽樣 A Random Sample of 20 Points**
+```{r}
+set.seed(2); A = mvrnorm(20, mu, Sigma) %>% data.frame
+colnames(A) = c("x", "y")
+```
+
+**使用樣本建立模型： Models with 1 and 2 Parameters**
+
++ Model-0: $y_i = b_0 + \epsilon_i$
+
++ Model-1: $y_i = b_0 + b_1 x_i + \epsilon_i$
+
+```{r fig.height=4, fig.width=4}
+m0 = lm(y ~ 1, A)    
+m2 = lm(y ~ x, A)
+plot(A,pch=20,xlim=c(0,5.2),ylim=c(0,5.2))
+abline(h=coef(m0), lty=3)
+abline(coef(m2)[1], coef(m2)[2], col="blue")
+```
+
+<span style="font-size:24px"> `r "\U1F4A1"` : </span>
+要產生一組$K$個相關的變數需要一個長度為$K$的平均值向量，和一個維度是$K \times K$的變異(共變)矩陣
+<br><hr>
+
+###【F】變異數分解 Decomposition of Variance
+
++ SST (Total Sum of Sq.) = $\Sigma_i(y_i - \bar{y}_i)^2$
+
++ SSE (Error Sum of Sq.) = $\Sigma_i(y_i - \hat{y_i})^2 = \Sigma_i e_i^2$
+
++ SSR (Regression Sum of Sq.) = SST - SSE
+
++ $R^2$ (判定係數 Determination Coef.) = SSR/SST，模型所能解釋目標變數的變異的能力
+
+```{r}
+SST = sum( (y - mean(y))^2 )            # Total Sum of Sq.
+SSE = sum( (y - md$fitted.values)^2 )   # Error Sum of Sq.
+SSR = SST - SSE                         # Regression Sum of sql
+R2 = SSR/SST    # The Propotion of Variance explained by Regressor   
+c(SST=SST, SSE=SSE, SSR=SSR, R2=R2)
+```
+
+```{r}
+cor(md$fitted.values, md$residuals)
+```
+
+<br>
+<span style="font-size:24px"> `r "\U1F4A1"` : </span>
+因為 Cov($\hat{y}$, $e$) = 0， 所以 Var($y$) = Var($\hat{y}+e$) = Var($\hat{y}$) + Var($e$) 
+<br><hr>
+
+###【G】類別自變數 和 變異數分析 Analysis of Variance (ANOVA)
+`lm()`裡面類別和連續預測變數的寫法是一樣的，做模型時，一個有k個分類的類別變數會產生(k-1)個虛擬變數(Dummy Variables) ...
+```{r}
+lm(Grocery ~ Region, W) %>% summary
+```
+<br>
+<span style="font-size:24px"> `r "\U1F4A1"` : </span>
+The idea of Dummy Variables
+
++ $\hat{y}_i = b_0 + b_1 Reg2 + b_2 Reg3$
+
++ $\hat{y}_i = 3.6297 + 0.1499 \times Reg2 + 0.0282 \times Reg3$
+
++ $\hat{y}_{reg1} = 3.6297$
+
++ $\hat{y}_{reg2} = 3.6297 + 0.1499$
+
++ $\hat{y}_{reg3} = 3.6297 + 0.0282$
+
+<br>
+
+##### ANOVA 檢定各分群的平均值是否相等
+
++ 虛無假設： $H_0 : u_0 = u_1 = u_2 = ...$ 分群的平均值都相等
+
+```{r}
+aov(Grocery ~ Region, data = W) %>% summary
+```
+$p=0.21 > 0.05$ 不能拒絕各區域(`Region`)雜貨購貨量(`Grocery`)的平均值之間沒有差異的虛無假設
+
+<span style="font-size:24px"> `r "\U1F4A1"` : </span>
+其實做Simple Regression和ANOVA檢定之前分別都有一些前提假設和殘差分析需要確認，
+詳情請看[教科書](https://cran.r-project.org/web/packages/IPSUR/vignettes/IPSUR.pdf)
+
+<br>
+
+##### Kruskal-Wallis 檢定
+當某些前提假設不能成立時，我們可以借助無母數(non-parametric)的檢定方法
+```{r}
+df = ToothGrowth
+head(df)
+```
+
+[`ggpubr`套件](http://www.sthda.com/english/articles/24-ggpubr-publication-ready-plots/)
+裡面有自動化工具可以做整體和個別(事後Post-Hoc)檢定並畫出圖形
+```{r}
+compare <- list( c("0.5", "1"), c("1", "2"), c("0.5", "2") )
+ggboxplot(
+  df, x = "dose", y = "len",
+  color = "dose", palette =c("#00AFBB", "#E7B800", "#FC4E07"),
+  add = "jitter", shape = "dose") +
+  stat_compare_means(comparisons = compare) + 
+  stat_compare_means(label.y = 50)        
+```
+
+<span style="font-size:24px"> `r "\U1F4A1"` : </span>
+如果組間平均值的檢定顯著，通常我們需要進一步做事後(Post-Hoc)檢定，藉以比較各分組兩兩之間的平均值。
+<br><br><br><hr>
+
+
+
