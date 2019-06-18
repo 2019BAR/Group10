@@ -1,0 +1,581 @@
+---
+title: Group 10 Final
+author: Group 10
+date: "`r Sys.time()`"
+output:
+  html_document:
+    highlight: pygments
+    theme: flatly
+    css: style.css
+---
+<br>
+
+### 資料彙整流程
+
+
+### 1. 交易項目計錄：`Z`
+
+```{r echo=T, message=F, cache=F, warning=F}
+rm(list=ls(all=T))
+Sys.setlocale("LC_TIME","C")
+pacman::p_load(magrittr, readr, caTools, ggplot2, dplyr)
+```
+
+##### 1.1 讀進資料
+```{r}
+Z = read_csv("data/ta_feng_all_months_merged.csv") %>% data.frame %>% 
+  setNames(c("date","cust","age","area","cat","prod","qty","cost","price"))
+nrow(Z)
+```
+
+##### 資料格式轉換
+```{r}
+Z$date = as.Date(Z$date, format="%m/%d/%Y")
+Z$age[is.na(Z$age)] = "na"
+Z$age = factor(Z$age, levels=c(
+  "<25","25-29","30-34","35-39","40-44","45-49","50-54","55-59","60-64",">65","na"), labels=c(
+  "a20","a25","a30","a35","a40","a45","a50","a55","a60","a65","na"
+  )) %>% as.character
+Z$area = paste0("z",Z$area)
+summary(Z)
+```
+
+##### 處理離群值
+```{r}
+# Quantile of Variables
+sapply(Z[,7:9], quantile, prob=c(.99, .999, .9995))
+```
+
+```{r}
+# Remove Outliers
+Z = subset(Z, qty<=24 & cost<=3800 & price<=4000) 
+nrow(Z)  
+```
+
+##### 彙總訂單 Assign Transaction ID
+```{r}
+Z$tid = group_indices(Z, date, cust) # same customer same day
+```
+
+##### 資料總覽
+```{r}
+# No. cust, cat, prod, tid
+sapply(Z[c("cust","cat","prod","tid")], n_distinct)
+```
+
+```{r}
+# Summary of Item Records
+summary(Z)
+```
+<br><hr>
+
+### 2. 交易計錄：`X`
+
+##### 交易資料彙整
+```{r}
+X = Z %>% group_by(tid) %>% summarise(
+  date = date[1],             # 交易日期  
+  cust = cust[1],             # 顧客 ID
+  age = age[1],               # 顧客 年齡級別
+  area = area[1],             # 顧客 居住區別
+  items = n(),                # 交易項目(總)數
+  pieces = sum(qty),          # 產品(總)件數
+  total = sum(price),         # 交易(總)金額
+  gross = sum(price - cost)   # 毛利
+  ) %>% data.frame
+nrow(X) # 119422                 
+```
+
+##### 交易摘要
+```{r}
+summary(X)    
+```
+
+##### 處理離群值
+```{r}
+# Check Quantile & Remove Outliers
+sapply(X[,6:9], quantile, prob=c(.999, .9995, .9999))
+```
+
+```{r}
+# Remove Outliers
+X = subset(X, items<=62 & pieces<95 & total<16000) # 119328
+```
+
+##### 每周交易次數
+```{r fig.height=3, fig.width=7}
+par(cex=0.8)
+hist(X$date, "weeks", freq=T, las=2, main="No. Transaction per Week")
+```
+<br><hr>
+
+### 3. 顧客資料：`A`
+
+##### 顧客資料彙整
+```{r}
+d0 = max(X$date) + 1
+A = X %>% mutate(
+  days = as.integer(difftime(d0, date, units="days"))
+  ) %>% 
+  group_by(cust) %>% summarise(
+    r = min(days),      # recency
+    s = max(days),      # seniority
+    f = n(),            # frquency
+    m = mean(total),    # monetary
+    rev = sum(total),   # total revenue contribution
+    raw = sum(gross),   # total gross profit contribution
+    age = age[1],       # age group
+    area = area[1],     # area code
+  ) %>% data.frame      # 33241
+nrow(A)
+```
+
+
+
+##### 顧客摘要
+```{r}
+summary(A) 
+```
+
+
+##### RFM分群
+```{r}
+#做出RF分佈圖
+# 切割頻率
+orders.segm <- A %>%
+  mutate(buy_freq=ifelse(between(f, 1, 10), '1',
+                          ifelse(between(f, 11, 20), '2',
+                                 ifelse(between(f, 21, 30), '3',
+                                        ifelse(between(f, 31, 40), '4',
+                                               ifelse(between(f, 41, 50), '5', '>5')))))) %>%
+  
+  
+  # 切割近因畫出邊界
+  mutate(segm.rec=ifelse(between(r, 0, 7), '0-7 days',
+                         ifelse(between(r, 8, 15), '8-15 days',
+                                ifelse(between(r, 16, 22), '16-22 days',
+                                       ifelse(between(r, 23, 30), '23-30 days',
+                                              ifelse(between(r, 31, 55), '31-55 days', '>55 days')))))) %>%
+  arrange(A$cust)
+
+
+# 定義邊界的順序
+orders.segm$buy_freq <- factor(orders.segm$buy_freq, levels=c('>5', '5', '4', '3', '2', '1'))
+orders.segm$segm.rec <- factor(orders.segm$segm.rec, levels=c('>55 days', '31-55 days', '23-30 days', '16-22 days', '8-15 days', '0-7 days'))
+
+
+
+lcg <- orders.segm %>%
+  group_by(segm.rec, buy_freq) %>%
+  summarise(quantity=n()) %>%
+  mutate(client='customers') %>%
+  ungroup()
+
+lcg.matrix= as.data.frame.matrix(table(orders.segm$buy_freq, orders.segm$segm.rec))
+lcg.matrix$buy_freq = row.names(lcg.matrix) 
+lcg.matrix
+
+# 繪製RFM分析圖
+lcg.adv <- lcg %>%
+  mutate(rec.type = ifelse(segm.rec %in% c(">55 days", "31-55 days", "23-30 days"), "not recent", "recent"),
+         freq.type = ifelse(buy_freq %in% c(">5", "5", "4"), "frequent", "infrequent"),
+         customer.type = interaction(rec.type, freq.type))
+
+ggplot(lcg.adv, aes(x=client, y=quantity, fill=customer.type)) +
+  theme_bw() +
+  geom_rect(aes(fill = customer.type), xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf, alpha = 0.1) +
+  facet_grid(buy_freq ~ segm.rec) +
+  geom_bar(stat='identity', alpha=0.7) +
+  geom_text(aes(y=max(quantity)/2, label=quantity), size=4) +
+  ggtitle("R&F Analysis Graphics") +
+  xlab("Days to last time purchase") + ylab("Purchase Frequency")+ 
+  guides(fill=guide_legend(title="Group color"))+
+  scale_fill_discrete(name="Experimental\nCondition",breaks = c('not recent.frequent','recent.frequent','not recent.infrequent','recent.infrequent'), labels = c('Former Customers','Frequent-coming Customers','One-time Customers','New Customers'))
+
+lcg.sub <- orders.segm %>%
+  group_by(segm.rec, buy_freq) %>%
+  summarise(quantity=n()) %>%
+  mutate(client='customers') %>%
+  ungroup()
+
+```
+
+
+```{r}
+#細部切割10個客群
+library(plotly)
+set.seed(111)
+A$grp = kmeans(scale(A[,c(2:5)]),10)$cluster
+table(A$grp)  # 族群大小
+```
+
+```{r}
+#RFM分群泡泡圖
+group_by(A, grp) %>% summarise(
+  recent=mean(r), 
+  freq=mean(f), 
+  money=mean(m), 
+  size=n() ) %>% 
+  mutate( revenue = size*money/1000 )  %>% 
+  filter(size > 1) %>% 
+  ggplot(aes(x=freq, y=money)) +
+  geom_point(aes(size=revenue, col=recent),alpha=0.5) +
+  scale_size(range=c(4,30)) +
+  scale_color_gradient(low="green",high="red") +
+  scale_x_log10() + scale_y_log10(limits=c(30,5000)) + 
+  geom_text(aes(label = size ),size=3) +
+  theme_bw() + guides(size=F) +
+  labs(title="Customer Segements",
+       subtitle="(bubble_size:revenue_contribution; text:group_size)",
+       color="Recency") +
+  xlab("Frequency (log)") + ylab("Average Transaction Amount (log)")
+
+ggplotly()
+
+```
+
+
+```{r fig.height=8}
+#分佈情形
+par(mfrow=c(3,2), mar=c(3,3,4,2))
+for(x in c('r','s','f','m')) 
+  hist(A[,x],freq=T,main=x,xlab="",ylab="",cex.main=2)
+hist(pmin(A$f,10),0:10,freq=T,xlab="",ylab="",cex.main=2)
+hist(log(A$m,10),freq=T,xlab="",ylab="",cex.main=2)
+```
+
+
+```{r}
+#定位分群
+STS = c("菜雞","積優股","冤大頭","提款機","沈思者","大雄","Almost葛屁")
+Status = function(rx,fx,mx,sx,K) {factor(
+  ifelse(sx < 3*K,
+         ifelse(fx*mx > 1600, "積優股", "菜雞"),
+         ifelse(rx < 2*K,
+                ifelse(sx/fx < 0.41*K,"提款機","冤大頭"),
+                ifelse(rx < 4*K,"沈思者",
+                       ifelse(rx < 5*K,"大雄","Almost葛屁")))), STS)}
+```
+
+```{r}
+K = as.integer(sum(A$s[A$f>1]) / sum(A$f[A$f>1])); K
+```
+
+
+##### Check & Save
+```{r}
+is.na(Z) %>% colSums
+```
+
+```{r}
+is.na(X) %>% colSums
+```
+
+```{r}
+is.na(A) %>% colSums
+```
+
+```{r}
+A0 = A; X0 = X; Z0 = Z
+save(Z0, X0, A0, file="data/tf0.rdata")
+```
+<br><hr>
+
+### Preparing The Predictors (X)
+```{r echo=T, message=F, cache=F, warning=F}
+Sys.setlocale("LC_TIME","C")
+pacman::p_load(magrittr, readr, caTools, ggplot2, dplyr)
+load("data/tf0.rdata")
+```
+
+##### The Demarcation Date
+Remove data after the demarcation date
+```{r}
+feb01 = as.Date("2001-02-01")
+Z = subset(Z0, date < feb01)    # 618212
+```
+
+##### Aggregate for the Transaction Records
+```{r}
+X = group_by(Z, tid) %>% summarise(
+  date = first(date),  # 交易日期
+  cust = first(cust),  # 顧客 ID
+  age = first(age),    # 顧客 年齡級別
+  area = first(area),  # 顧客 居住區別
+  items = n(),                # 交易項目(總)數
+  pieces = sum(qty),          # 產品(總)件數
+  total = sum(price),         # 交易(總)金額
+  gross = sum(price - cost)   # 毛利
+  ) %>% data.frame  # 88387
+```
+
+```{r}
+summary(X)
+```
+
+##### Check Quantile and Remove Outlier 
+```{r}
+sapply(X[,6:9], quantile, prob=c(.999, .9995, .9999))
+```
+
+```{r}
+X = subset(X, items<=64 & pieces<=98 & total<=11260) # 88387 -> 88295
+```
+
+##### Aggregate for Customer Records
+```{r}
+d0 = max(X$date) + 1
+A = X %>% mutate(
+  days = as.integer(difftime(d0, date, units="days"))
+  ) %>% 
+  group_by(cust) %>% summarise(
+    r = min(days),      # recency
+    s = max(days),      # seniority
+    f = n(),            # frquency
+    m = mean(total),    # monetary
+    rev = sum(total),   # total revenue contribution
+    raw = sum(gross),   # total gross profit contribution
+    age = age[1],       # age group
+    area = area[1],     # area code
+    Status = Status(r,f,m,s,K)
+  ) %>% data.frame      # 28584
+nrow(A)
+```
+<br><br><hr>
+
+### Preparing the Target Variables (Y)
+
+##### Aggregate Feb's Transaction by Customer
+```{r}
+feb = filter(X0, date>= feb01) %>% group_by(cust) %>% 
+  summarise(amount = sum(total))  # 16899
+```
+
+##### The Target for Regression - `A$amount`
+Simply a Left Joint
+```{r}
+A = merge(A, feb, by="cust", all.x=T)
+```
+
+##### The Target for Classification - `A$buy`
+```{r}
+A$buy = !is.na(A$amount)
+```
+
+##### Summary of the Dataset
+```{r}
+summary(A)
+```
+
+##### The Association of Categorial Predictors
+```{r fig.height=3, fig.width=7.2}
+tapply(A$buy, A$age, mean) %>% barplot
+abline(h = mean(A$buy), col='red')
+```
+
+```{r fig.height=3, fig.width=7.2}
+tapply(A$buy, A$area, mean) %>% barplot(las=2)
+abline(h = mean(A$buy), col='red')
+```
+
+```{r}
+X = subset(X, cust %in% A$cust & date < as.Date("2001-02-01"))
+Z = subset(Z, cust %in% A$cust & date < as.Date("2001-02-01"))
+set.seed(2018); spl = sample.split(A$buy, SplitRatio=0.7)
+c(nrow(A), sum(spl), sum(!spl))
+```
+
+```{r fig.height=3, fig.width=7}
+cbind(A, spl) %>% filter(buy) %>% 
+  ggplot(aes(x=log(amount))) + geom_density(aes(fill=spl), alpha=0.5)
+```
+
+
+```{r}
+A2 = subset(A, buy) %>% mutate_at(c("m","rev","amount"), log10)
+n = nrow(A2)
+set.seed(2018); spl2 = 1:n %in% sample(1:n, round(0.7*n))
+c(nrow(A2), sum(spl2), sum(!spl2))
+```
+
+```{r fig.height=3, fig.width=7}
+cbind(A2, spl2) %>% 
+  ggplot(aes(x=amount)) + geom_density(aes(fill=spl2), alpha=0.5)
+```
+
+
+```{r}
+save(Z, X, A, spl, spl2, file="data/tf2.rdata")
+```
+
+<br><br><hr>
+
+### Loading & Preparing Data
+```{r echo=T, message=F, cache=F, warning=F}
+TR = subset(A, spl)
+TS = subset(A, !spl)
+```
+<br><hr>
+
+### Classification Model
+```{r}
+glm1 = glm(buy ~ ., TR[,c(2:8,10,12)], family=binomial()) 
+summary(glm1)
+pred =  predict(glm1, TS, type="response")
+cm = table(actual = TS$buy, predict = pred > 0.5); cm
+acc.ts = cm %>% {sum(diag(.))/sum(.)}; acc.ts          # 0.69998
+colAUC(pred, TS$buy)                                   # 0.7556
+```
+<br><hr>
+
+### Regression Model
+```{r}
+A2 = subset(A, A$buy) %>% mutate_at(c("m","rev","amount"), log10)
+TR2 = subset(A2, spl2)
+TS2 = subset(A2, !spl2)
+```
+
+```{r}
+lm1 = lm(amount ~ ., TR2[,c(2:6,8,9,11)])
+summary(lm1)
+```
+
+```{r}
+r2.tr = summary(lm1)$r.sq
+SST = sum((TS2$amount - mean(TR2$amount))^ 2)
+SSE = sum((predict(lm1, TS2) -  TS2$amount)^2)
+r2.ts = 1 - (SSE/SST)
+c(r2.tr, r2.ts)
+```
+<br><hr>
+
+### Prediction
+```{r}
+load("data/tf0.rdata")
+d0 = max(X0$date) + 1
+B = X0 %>% 
+  filter(date >= as.Date("2000-12-01")) %>% 
+  mutate(days = as.integer(difftime(d0, date, units="days"))) %>% 
+  group_by(cust) %>% summarise(
+    r = min(days),      # recency
+    s = max(days),      # seniority
+    f = n(),            # frquency
+    m = mean(total),    # monetary
+    rev = sum(total),   # total revenue contribution
+    raw = sum(gross),   # total gross profit contribution
+    age = age[1],       # age group
+    area = area[1],     # area code
+    Status = Status(r,f,m,s,K)
+  ) %>% data.frame      # 28584
+nrow(B)
+```
+
+```{r}
+B$Buy = predict(glm1, B, type="response")
+```
+
+```{r}
+B$Rev = predict(lm1, B)
+```
+
+```{r fig.height=2.4, fig.width=7.2}
+par(mfrow=c(1,2), cex=0.8)
+hist(B$Buy)
+hist(log(B$Rev,10))
+```
+
+<br><br><hr><br><br>
+
+
+
+
+```{r fig.height=2.4, fig.width=7.2}
+par(mfrow=c(1,2), cex=0.8)
+hist(B$Buy)
+hist(log(B$Rev,10))
+```
+
+<br><br><hr><br><br>
+
+
+
+
+#####篩出目標顧客
+```{r}
+#篩出目標顧客以做行銷
+Target = subset(B, Status=="績優股"|Status == "菜雞")
+Target%>%group_by(age)%>%summarise(
+  Rev = sum(Rev)
+)%>%arrange(desc(Rev))
+
+P0=A$ProbRetain
+R0=A$PredRevenue 
+```
+
+
+
+
+```{r}
+m=0.20; a=20; b=15
+curve(m*plogis((10/a)*(x-b)), 0, 30, lwd=2, ylim=c(0, 0.25),
+      main=TeX('$m \\cdot Logis(10(x - b)/a)$'), ylab="f(x)")
+abline(h=seq(0,0.2,0.05),v=seq(0,30,5),col='lightgrey',lty=2)
+```
+
+```{r}
+
+library(manipulate)
+#使用manipulate套件進行行銷模擬(需複製到R Script)
+# manipulate({
+#   curve(m*plogis((10/a)*(x-b)), 0, 30, lwd=2, ylim=c(0, 0.25),
+#         main = TeX('$m \\cdot Logis(10(x - b)/a)$'), ylab="f(x)")
+#   abline(h=seq(0,0.2,0.05),v=seq(0,30,5),col='lightgrey',lty=2)
+# },
+# m = slider(0.05, 0.25,  0.20, step=0.01),
+# a = slider(  10,   30,    20, step=1),
+# b = slider(   4,   20,    15, step=1)
+# ) 
+
+#調整變數
+#行銷情境1
+m=0.2; a=20; b=20
+m=0.2; a
+do.call(rbind, lapply(seq(5,40,0.5), function(c){
+  p = m*plogis((10/a)*(c-b))
+  Target %>% mutate(
+    PI = ifelse(Buy<=(1-p), p, 1-Buy) * Rev - c
+  ) %>%
+    group_by(Status) %>% summarise(
+      Cost = c,
+      Group.Sz = n(),
+      No.Target = sum(PI>0),
+      AvgROI = mean(PI[PI>0]),
+      TotalROI = sum(PI[PI>0])
+    ) } ) ) %>% 
+  ggplot(aes(x=Cost, y=TotalROI, col=Status)) +
+  geom_line(size=1.2) +
+  ggtitle("Cost Effeciency per Segment ")
+
+#行銷情境二
+m=0.2; a=20; b=11
+do.call(rbind, lapply(seq(5,40,0.5), function(c){
+  p = m*plogis((10/a)*(c-b))
+  Target %>% mutate(
+    PI = ifelse(Buy<=(1-p), p, 1-Buy) * Rev - c
+  ) %>%
+    group_by(Status) %>% summarise(
+      Cost = c,
+      Group.Sz = n(),
+      No.Target = sum(PI>0),
+      AvgROI = mean(PI[PI>0]),
+      TotalROI = sum(PI[PI>0])
+    ) } ) ) %>% 
+  ggplot(aes(x=Cost, y=TotalROI, col=Status)) +
+  geom_line(size=1.2) +
+  ggtitle("Cost Effeciency per Segment ")
+
+```
+
+
+
+
